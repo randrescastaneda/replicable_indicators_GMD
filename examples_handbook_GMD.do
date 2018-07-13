@@ -18,7 +18,7 @@ drop _all
 
 * Load data
 datalibweb, country(PRY) year(2006 2016) type(GMD) module(ALL)/* 
- */ incppp(welfare) ppp(2011) clear
+*/ incppp(welfare) ppp(2011) clear
 
 
 /*==================================================
@@ -91,7 +91,11 @@ Growth Incidence Curve
 ==================================================*/
 * check command gicurve by Lokshin
 bysort year: quantiles welfare_ppp [w = weight_p], /* 
- */          keeptog(hhid) n(100) gen(q)
+*/          keeptog(hhid) n(100) gen(q)
+
+xtile xq = welfare_ppp [w = weight_p] if year == 2006, /* 
+*/          n(100) 
+
 
 preserve
 rename welfare_ppp* w*
@@ -99,7 +103,13 @@ rename welfare_ppp* w*
 sum year, meanonly
 local year1 = r(min)  
 local year2 = r(max)  
-local period = r(max) - r(min)
+
+* Alternative way
+/* levelsof year, local(years)
+local year1: word 1 of `years'
+local year2: word 2 of `years'
+*/
+local period = r(max)-r(min)
 
 sum w [w = weight_p] if year == `year1' , mean
 local w1_mean = r(mean)
@@ -110,6 +120,11 @@ local w2_mean = r(mean)
 collapse (mean) w [w = weight_p], by(year q)
 
 reshape wide w, i(q) j(year)
+
+local year1 = 2006
+local year2 = 2016
+local period = `year2' - `year1'
+
 gen ann_gic = ((w`year2'/w`year1')^(1/`period')-1)*100
 gen ann_gro = ((`w2_mean'/`w1_mean')^(1/`period')-1)*100
 sum ann_gic, meanonly
@@ -141,7 +156,7 @@ foreach year in `year1' `year2' {
 	foreach case in 1 2 3 {
 		if      (`case' == 1) local iff ""
 		else if (`case' == 2) local iff "& q <= 40"
-		else                  local iff "& q  > 40"
+		else                  local iff "& q  > 40 & q <."
 		
 		sum welfare_ppp [w = weight_p] if year == `year' `iff', meanonly
 		local m`y'`case' = r(mean)
@@ -161,6 +176,7 @@ display _newline(2) /*
 */ _n in g " Annualized growth of T60"   _col(32) "= " in w  %5.2f `t60_gr' /* 
 */ _n in g " Premium"                    _col(32) "= " in w  %5.2f `premium' _n
 
+
 prosperity welfare_ppp [w = weight_p], period(year)
 
 /*==================================================
@@ -177,6 +193,7 @@ qui foreach pl of local plines	{
 	mat b = r(b)
 	mat `M' = nullmat(`M') \ (J(rowsof(b),1,`pl'), b) // Append results
 }
+mat list `M'
 
 mat colnames `M' = poverty_line fgt effect rate 
 svmat double `M', n(col) //converts matrix to variables
@@ -188,9 +205,9 @@ label values fgt fgt
 
 * poverty line labels
 label define poverty_line /* 
- */  190 "US $1.9 a day" /* 
- */  320 "US $3.2 a day" /* 
- */  550 "US $5.5 a day" , modify 
+*/  190 "US $1.9 a day" /* 
+*/  320 "US $3.2 a day" /* 
+*/  550 "US $5.5 a day" , modify 
 label values poverty_line poverty_line
 
 * indicator labels
@@ -220,8 +237,8 @@ foreach var of local vars {
 	if (_rc) replace `var' = `m`var''
 } 
 
-hoi water            /* 
-*/  urban male      /* 
+hoi water            /*  dependent variable  Opportunity
+*/  urban male      /*   Independent, circumstances
 */  [w=weight_p] if inrange(age, 10, 15) , by(year) decomp2
 
 
